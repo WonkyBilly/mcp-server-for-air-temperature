@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 const app = Fastify({ logger: true });
 
@@ -9,7 +10,7 @@ const mcpServer = new Server(
   { capabilities: { tools: {} } }
 );
 
-mcpServer.setRequestHandler('tools/list', async () => ({
+mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [{
     name: 'get_air_temperature',
     description: 'Get real-time air temperature from Singapore',
@@ -20,7 +21,7 @@ mcpServer.setRequestHandler('tools/list', async () => ({
   }]
 }));
 
-mcpServer.setRequestHandler('tools/call', async (request) => {
+mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === 'get_air_temperature') {
     const response = await fetch('https://api-open.data.gov.sg/v2/real-time/api/air-temperature');
     const data = await response.json();
