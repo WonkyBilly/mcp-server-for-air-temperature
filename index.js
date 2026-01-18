@@ -1,60 +1,45 @@
-import Fastify from 'fastify';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamable-http.js';
-import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import http from 'http';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { z } from 'zod';
 
-const app = Fastify({ logger: true });
+const server = new McpServer({
+  name: 'sg-air-temp',
+  version: '1.0.0'
+});
 
-app.all('/mcp', async (request, reply) => {
-  const mcpServer = new Server(
-    { name: 'sg-air-temp', version: '1.0.0' },
-    { capabilities: { tools: {} } }
-  );
+server.tool(
+  'get_air_temperature',
+  'Get real-time air temperature from Singapore',
+  {},
+  async () => {
+    const response = await fetch('https://api-open.data.gov.sg/v2/real-time/api/air-temperature');
+    const data = await response.json();
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(data, null, 2)
+      }]
+    };
+  }
+);
 
-  mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [{
-      name: 'get_air_temperature',
-      description: 'Get real-time air temperature from Singapore',
-      inputSchema: {
-        type: 'object',
-        properties: {}
-      }
-    }]
-  }));
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: undefined // stateless
+});
 
-  mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
-    if (req.params.name === 'get_air_temperature') {
-      const response = await fetch('https://api-open.data.gov.sg/v2/real-time/api/air-temperature');
-      const data = await response.json();
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(data, null, 2)
-        }]
-      };
-    }
-    throw new Error('Unknown tool');
-  });
+await server.connect(transport);
 
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // stateless
-    enableJsonResponse: true
-  });
-
-  reply.raw.on('close', () => {
-    transport.close();
-    mcpServer.close();
-  });
-
-  await mcpServer.connect(transport);
-  await transport.handleRequest(request.raw, reply.raw);
+const httpServer = http.createServer(async (req, res) => {
+  if (req.url === '/mcp' && req.method === 'POST') {
+    await transport.handleRequest(req, res);
+  } else {
+    res.writeHead(404);
+    res.end('Not Found');
+  }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
-  if (err) {
-    app.log.error(err);
-    process.exit(1);
-  }
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`MCP Server running on port ${PORT}`);
 });
