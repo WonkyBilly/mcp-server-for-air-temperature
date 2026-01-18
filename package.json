@@ -1,0 +1,12 @@
+{
+  "name": "sg-air-temp-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "fastify": "^5.2.0"
+  }
+}
